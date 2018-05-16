@@ -1,6 +1,6 @@
-google-auth==1.4.1
-google-cloud==0.32.0
-google-cloud-dns==0.29.0
-google-oauth==1.0.1
-google-oauth2l==1.0.2
-requests==2.18.4
+google-auth
+google-cloud
+google-cloud-dns
+google-oauth
+google-oauth2l
+requests

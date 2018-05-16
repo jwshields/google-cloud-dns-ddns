@@ -5,14 +5,10 @@ This script was created to help automate updating Google Cloud DNS records via t
 
 Currently this script is aimed toward updating `A` and `AAAA` records only.
 
-##Python Requirements
-
-###Environment:
-
+## Python Requirements
+### Environment:
 - Python 3.6+
-
-###Imports
-
+### Imports
 - google.oauth2
 - google.cloud.dns
 - os
@@ -56,4 +52,4 @@ This script accepts multiple arguments
 2. `python /path/to/script/googleclouddns.py -r "mydomain.com" A -c "/path/to/my/credentials.json"`
     - This example will create a single A record for `mydomain.com` and will prompt the user to proceed to create/update the records
 
-####EOF
+#### EOF

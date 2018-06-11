@@ -10,8 +10,8 @@ from google.cloud import dns as gdns
 def argparser():
     # argparse to gather command line args
     # also to show help text
-    usagestr = (f'googleclouddns.py --credentials "/path/to/service/creds.json" --record "subdomain.example.com" "A" \n'
-                f'                         --record [FQDN] [record type] -r [FQDN] [record type]')
+    usagestr = (f"""googleclouddns.py --credentials "/path/to/service/creds.json" --record "subdomain.example.com" "A"
+                         --record [FQDN] [record type] -r [FQDN] [record type]\n""")
     parser = argparse.ArgumentParser(prog='googleclouddns', usage=usagestr)
     rhelpstr = (f"A required argument that can be listed unlimited times\nThis argument expects, in order, "
                 f"a FQDN hostname, and a record type.")

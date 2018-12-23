@@ -148,10 +148,10 @@ def check_records(my_zone_int, records, ipv4ip, ipv6ip):
                 if len(recordset.rrdatas) > 1:
                     no_touch = True
                     break
-                if recordset.record_type == "A" and str(recordset.rrdatas[0]) == str(ipv4ip):
+                if (recordset.record_type == "A") and (str(recordset.rrdatas[0]) == str(ipv4ip)):
                     no_touch = True
                     break
-                elif recordset.record_type == "AAAA" and str(recordset.rrdatas[0] == str(ipv6ip)):
+                elif (recordset.record_type == "AAAA") and (str(recordset.rrdatas[0]) == str(ipv6ip)):
                     no_touch = True
                     break
                 else:
@@ -221,7 +221,7 @@ if __name__ == '__main__':
         # Else, take no action
         if to_create:
             changes_returned, len_additions = add_records(my_zone, to_create, ipv4ip, ipv6ip)
-            print(f"Created {len_additions} records.\n")
+            print(f"Created {len_additions} record{'s' if len_additions != 1 else ''}.\n")
         else:
             print(f"All given records for {my_zone.dns_name} are up to date. "
                   f"Not performing any actions on this zone.\n")

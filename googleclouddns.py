@@ -158,12 +158,12 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
             record[0] = "{0}.".format(record[0])
         for recordset in existing_list:
             if recordset.name == record[0] and record[1] == recordset.record_type:
-                existing_record = True
                 # We explicitly do not want to modify records that have more than one entry.
                 if len(recordset.rrdatas) > 1:
                     no_touch = True
                     break
                 # Check the TTL length
+                existing_record = True
                 if ttl != recordset.ttl:
                     ttl_diff = True
                 # Small if/else for A/AAAA records

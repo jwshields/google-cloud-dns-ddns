@@ -78,7 +78,7 @@ def load_creds():
         gscoped_credentials = gcredentials.with_scopes(['https://www.googleapis.com/auth/ndev.clouddns.readwrite'])
         return gscoped_credentials
     else:
-        print("\nThe location given for the service account credentials.json file was not found.")
+        print("\nThe location given for the service account credentials json file was not found.")
         exit(1)
 
 
@@ -120,13 +120,14 @@ def zones_to_edit_func(all_zones_func, records):
     # create an empty dict of lists from the collections package
     zones_to_edit1 = collections.defaultdict(list)
     passed_records_with_no_zone1 = {}
-    # iterate through records to match if it's a
+    # iterate through records to match if it's a zone that we have access to via the passed credentials
     for record_inside in records:
         zonekey = zone_search(all_zones_func, record_inside[0])
         if zonekey is not None:
             zones_to_edit1[str(zonekey)].append(record_inside)
         else:
             passed_records_with_no_zone1[str(record_inside[0])] = record_inside
+    # Print something if we get records in a zone we don't have
     if passed_records_with_no_zone1:
         print("You have passed in arguments that I was unable to find a zone for.\nThese will be discarded:")
         for k, v in passed_records_with_no_zone1.items():
@@ -134,7 +135,7 @@ def zones_to_edit_func(all_zones_func, records):
     return zones_to_edit1, passed_records_with_no_zone1
 
 
-def check_records(my_zone_int, records, v4ip, v6ip):
+def check_records(my_zone_int, records, v4ip, v6ip, ttl):
     existing_list = list(my_zone_int.list_resource_record_sets())
     existing_del = {}
     create = {}
@@ -154,14 +155,24 @@ def check_records(my_zone_int, records, v4ip, v6ip):
             record[0] = "{0}.".format(record[0])
         for recordset in existing_list:
             if recordset.name == record[0] and record[1] == recordset.record_type:
+                ttl_diff = False
+                # We explicitly do not want to modify records that have more than one entry.
                 if len(recordset.rrdatas) > 1:
                     no_touch = True
                     break
+                # Check the TTL length
+                if ttl != recordset.ttl:
+                    ttl_diff = True
+                # Small if/else for A/AAAA records
                 if (recordset.record_type == "A") and (str(recordset.rrdatas[0]) == str(v4ip)):
                     no_touch = True
+                    if ttl_diff:
+                        no_touch = False
                     break
                 elif (recordset.record_type == "AAAA") and (str(recordset.rrdatas[0]) == str(v6ip)):
                     no_touch = True
+                    if ttl_diff:
+                        no_touch = False
                     break
                 else:
                     existing_del[str(recordset.name)] = recordset
@@ -191,7 +202,7 @@ def add_records(my_zone_int, new_create, v4ip, v6ip, ttl):
     # iterating over the `zones_to_edit1` dictlist and updating DNS for each zone
     my_zone_changes = my_zone_int.changes()
     changes_returned_internal = []
-    for name, value in new_create.items():
+    for _, value in new_create.items():
         if not value[0].endswith("."):
             value[0] = '{0}.'.format(value[0])
         if value[1] == "A" and v4ip is not None:
@@ -222,7 +233,7 @@ if __name__ == '__main__':
         my_zone = zone_list[str(zone_key)]
         print("Currently gathering records for {0}".format(my_zone.dns_name))
         # Check for existing records before doing anything
-        existing_to_delete, to_create, delete_len = check_records(my_zone, records_to_change, ipv4ip, ipv6ip)
+        existing_to_delete, to_create, _ = check_records(my_zone, records_to_change, ipv4ip, ipv6ip, arg_ns.ttl)
         # Delete existing records
         if existing_to_delete and to_create:
             existing_to_delete, to_create = delete_records(my_zone, existing_to_delete, to_create)

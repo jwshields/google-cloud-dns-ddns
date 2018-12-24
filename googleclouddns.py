@@ -186,7 +186,7 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
             else:
                 no_touch = False
                 pass
-        if all([existing_record, ttl_diff]):
+        if existing_record:
             existing_del[str(resource_record_set.name)] = resource_record_set
         if not no_touch:
             create['{0}.{1}'.format(record[0], record[1])] = record

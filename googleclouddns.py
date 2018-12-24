@@ -151,11 +151,14 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
     #   otherwise, we do edit it.
     for record in records:
         no_touch = False
+        ttl_diff = False
+        existing_record = False
+        resource_record_set = None
         if not record[0].endswith("."):
             record[0] = "{0}.".format(record[0])
         for recordset in existing_list:
             if recordset.name == record[0] and record[1] == recordset.record_type:
-                ttl_diff = False
+                existing_record = True
                 # We explicitly do not want to modify records that have more than one entry.
                 if len(recordset.rrdatas) > 1:
                     no_touch = True
@@ -168,19 +171,23 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
                     no_touch = True
                     if ttl_diff:
                         no_touch = False
+                        resource_record_set = recordset
                     break
                 elif (recordset.record_type == "AAAA") and (str(recordset.rrdatas[0]) == str(v6ip)):
                     no_touch = True
                     if ttl_diff:
                         no_touch = False
+                        resource_record_set = recordset
                     break
                 else:
-                    existing_del[str(recordset.name)] = recordset
                     no_touch = False
+                    resource_record_set = recordset
                     break
             else:
                 no_touch = False
                 pass
+        if all([existing_record, ttl_diff]):
+            existing_del[str(resource_record_set.name)] = resource_record_set
         if not no_touch:
             create['{0}.{1}'.format(record[0], record[1])] = record
     return existing_del, create, len(existing_del)

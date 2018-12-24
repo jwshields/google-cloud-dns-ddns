@@ -10,33 +10,42 @@ from google.cloud import dns as gdns
 def argparser():
     # argparse to gather command line args
     # also to show help text
-    usagestr = (f"""googleclouddns.py --credentials "/path/to/service/creds.json" --record "subdomain.example.com" "A"
-                         --record [FQDN] [record type] -r [FQDN] [record type]\n""")
+    usagestr = ("""googleclouddns.py --credentials "/path/to/service/creds.json" --record "subdomain.example.com" "A"
+                --record [FQDN] [record type] -r [FQDN] [record type]\n""")
     parser = argparse.ArgumentParser(prog='googleclouddns', usage=usagestr)
-    rhelpstr = (f"A required argument that can be listed unlimited times\nThis argument expects, in order, "
-                f"a FQDN hostname, and a record type.")
-    chelpstr = f"A required argument which points to the location on disk of the service account credentials.json file"
-    ip4helpstr = (f'An optional argument which is a boolean option, which chooses whether to update IPv4 '
-                  f'DNS (defaults to ipv4=True)')
-    ip6helpstr = (f'An optional argument which is a boolean option, which chooses whether to update IPv6 '
-                  f'DNS (defaults to ipv6=True)')
-    autostr = f'An option that performs updates automatically without prompting.'
+    rhelpstr = ("A required argument that can be listed an unlimited number of times\nThis argument expects, in order,"
+                "a FQDN hostname, and a record type.")
+    chelpstr = "A required argument which points to the location on disk of the service account credentials.json file"
+    ip4helpstr = ('An optional argument which is a boolean option, which chooses whether to update IPv4 DNS (defaults '
+                  'to ipv4=True)')
+    ip6helpstr = ('An optional argument which is a boolean option, which chooses whether to update IPv6 DNS (defaults '
+                  'to ipv6=True)')
+    ttlhelpstr = ('An optional argument which allows specifying the TTL of records to be processed. (Defaults to 300 '
+                  'seconds)')
+    autostr = 'An option that performs updates automatically without prompting.'
     parser.add_argument('--record', '-r', nargs=2, metavar=('"FQDN"', '{record type}'), action="append",
                         help=rhelpstr, required=True)
     parser.add_argument('--credentials', '-c', nargs=1, help=chelpstr, required=True)
     parser.add_argument('-noipv4', action="store_false", help=ip4helpstr, required=False, default=True)
     parser.add_argument('-noipv6', action='store_false', help=ip6helpstr, required=False, default=True)
     parser.add_argument('-auto', action='store_true', help=autostr, required=False, default=False)
+    parser.add_argument('-ttl', action='store', help=ttlhelpstr, required=False, default=300, type=int)
     arg_ns_1 = parser.parse_args()
     # sort the records because why not
     arg_ns_1.record = sorted(arg_ns_1.record)
     # Print info about records received
-    print(f"Got {len(arg_ns_1.record)} records to process:")
+    print("Got {0} records to process:".format(len(arg_ns_1.record)))
     temp_records = []
     for record in arg_ns_1.record:
         if (record[1]).upper() in ["A", "AAAA", "TXT", "MX", "CAA", "CNAME", "NS"]:
-            print(f"""- "{record[0]}" with an "{record[1]}" record""")
+            print("""- "{0}" with an "{1}" record""".format(record[0], record[1]))
             temp_records.append(record)
+    if arg_ns_1.ttl == 300:
+        ttlprintstr = ("\nA TTL value was either not specified or the flag was set to 300, using default value of 300 "
+                       "seconds.")
+    else:
+        ttlprintstr = "\nSpecifying a TTL value of {0} for all records being processed.".format(arg_ns_1.ttl)
+    print(ttlprintstr)
     arg_ns_1.record = temp_records
     return arg_ns_1
 
@@ -46,9 +55,9 @@ def auto_proceed(arg_ns_2):
     # if not auto, prompt to proceed
     proceed = arg_ns_2.auto
     if not proceed:
-        print(f"\nI will be reaching out to two external hosts to retrieve IP information. These hosts are:\n"
-              f"- `4.icanhazip.com`\n- `6.icanhazip.com`")
-        proceed = input("\nDo you want to proceed with the DNS update?\ny/n: ")
+        print("\nI will be reaching out to two external hosts to retrieve IP information. These hosts are:\n"
+              "- `4.icanhazip.com`\n- `6.icanhazip.com`")
+        proceed = input("\nDo you want to proceed?\ny/n: ")
         if proceed.lower() != "y":
             print("\nNo changes have been made...\nExiting script")
             time.sleep(0.25)
@@ -67,7 +76,7 @@ def load_creds():
     if jsonpath:
         gcredentials = service_account.Credentials.from_service_account_file(arg_ns.credentials[0])
         gscoped_credentials = gcredentials.with_scopes(['https://www.googleapis.com/auth/ndev.clouddns.readwrite'])
-        return gcredentials, gscoped_credentials
+        return gscoped_credentials
     else:
         print("\nThe location given for the service account credentials.json file was not found.")
         exit(1)
@@ -78,12 +87,12 @@ def retrieve_addresses(arg_ns_internal):
     print("\nRetrieving external addresses now...")
     if arg_ns_internal.noipv4:
         ipv4ip_internal = (requests.get('http://4.icanhazip.com')).text.strip('\n') or None
-        print(f"Received '{ipv4ip_internal}' as IPv4 address.")
+        print("Received '{0}' as IPv4 address.".format(ipv4ip_internal))
     else:
         ipv4ip_internal = None
     if arg_ns_internal.noipv6:
         ipv6ip_internal = (requests.get('http://6.icanhazip.com')).text.strip('\n') or None
-        print(f"Received '{ipv6ip_internal}' as IPv6 address.")
+        print("Received '{0}' as IPv6 address.".format(ipv6ip_internal))
     else:
         ipv6ip_internal = None
     print("")
@@ -92,7 +101,7 @@ def retrieve_addresses(arg_ns_internal):
 
 def zone_search(values, searchfor):
     for k, v in values.items():
-        if v.dns_name in f'{searchfor}.':
+        if v.dns_name in '{0}.'.format(searchfor):
             return k
     return None
 
@@ -103,7 +112,7 @@ def all_zones(gdnsclient_func):
     zones = gdnsclient_func.list_zones()
     zone_list1 = {}
     for zone in zones:
-        zone_list1[f'{zone.name}'] = zone
+        zone_list1[str(zone.name)] = zone
     return zone_list1
 
 
@@ -113,11 +122,11 @@ def zones_to_edit_func(all_zones_func, records):
     passed_records_with_no_zone1 = {}
     # iterate through records to match if it's a
     for record_inside in records:
-        zone_key = zone_search(all_zones_func, record_inside[0])
-        if zone_key is not None:
-            zones_to_edit1[f'{zone_key}'].append(record_inside)
+        zonekey = zone_search(all_zones_func, record_inside[0])
+        if zonekey is not None:
+            zones_to_edit1[str(zonekey)].append(record_inside)
         else:
-            passed_records_with_no_zone1[f'{record_inside[0]}'] = record_inside
+            passed_records_with_no_zone1[str(record_inside[0])] = record_inside
     if passed_records_with_no_zone1:
         print("You have passed in arguments that I was unable to find a zone for.\nThese will be discarded:")
         for k, v in passed_records_with_no_zone1.items():
@@ -125,10 +134,10 @@ def zones_to_edit_func(all_zones_func, records):
     return zones_to_edit1, passed_records_with_no_zone1
 
 
-def check_records(my_zone_int, records, ipv4ip, ipv6ip):
+def check_records(my_zone_int, records, v4ip, v6ip):
     existing_list = list(my_zone_int.list_resource_record_sets())
-    existing_to_delete = {}
-    to_create = {}
+    existing_del = {}
+    create = {}
     # This is a really hacky and shit method of doing this.
     # In this thing we start iterating over the list of records passed in as args
     # then we append a period to the end of a record if it does not have one;
@@ -142,76 +151,76 @@ def check_records(my_zone_int, records, ipv4ip, ipv6ip):
     for record in records:
         no_touch = False
         if not record[0].endswith("."):
-            record[0] = f"{record[0]}."
+            record[0] = "{0}.".format(record[0])
         for recordset in existing_list:
             if recordset.name == record[0] and record[1] == recordset.record_type:
                 if len(recordset.rrdatas) > 1:
                     no_touch = True
                     break
-                if (recordset.record_type == "A") and (str(recordset.rrdatas[0]) == str(ipv4ip)):
+                if (recordset.record_type == "A") and (str(recordset.rrdatas[0]) == str(v4ip)):
                     no_touch = True
                     break
-                elif (recordset.record_type == "AAAA") and (str(recordset.rrdatas[0]) == str(ipv6ip)):
+                elif (recordset.record_type == "AAAA") and (str(recordset.rrdatas[0]) == str(v6ip)):
                     no_touch = True
                     break
                 else:
-                    existing_to_delete[f'{recordset.name}'] = recordset
+                    existing_del[str(recordset.name)] = recordset
                     no_touch = False
                     break
             else:
                 no_touch = False
                 pass
         if not no_touch:
-            to_create[f'{record[0]}.{record[1]}'] = record
-    return existing_to_delete, to_create, len(existing_to_delete)
+            create['{0}.{1}'.format(record[0], record[1])] = record
+    return existing_del, create, len(existing_del)
 
 
-def delete_records(my_zone_int, existing_to_delete, to_create):
+def delete_records(my_zone_int, existing_del, new_create):
     my_zone_changes = my_zone_int.changes()
-    for k, v in existing_to_delete.items():
+    for k, v in existing_del.items():
         my_zone_changes.delete_record_set(v)
     my_zone_changes.create()
     while my_zone_changes.status != 'done':
         time.sleep(1)
         my_zone_changes.reload()
-    return existing_to_delete, to_create
+    return existing_del, new_create
 
 
-def add_records(my_zone_int, to_create, ipv4ip, ipv6ip):
+def add_records(my_zone_int, new_create, v4ip, v6ip, ttl):
     # begin the main bits of the script
     # iterating over the `zones_to_edit1` dictlist and updating DNS for each zone
     my_zone_changes = my_zone_int.changes()
-    changes_returned = []
-    for name, value in to_create.items():
+    changes_returned_internal = []
+    for name, value in new_create.items():
         if not value[0].endswith("."):
-            value[0] = f'{value[0]}.'
-        if value[1] == "A" and ipv4ip is not None:
-            rrs = my_zone_int.resource_record_set(value[0], 'A', 600, [ipv4ip, ])
+            value[0] = '{0}.'.format(value[0])
+        if value[1] == "A" and v4ip is not None:
+            rrs = my_zone_int.resource_record_set(value[0], 'A', ttl, [v4ip, ])
             my_zone_changes.add_record_set(rrs)
-            changes_returned.append(rrs)
-        if value[1] == "AAAA" and ipv6ip is not None:
-            rrs = my_zone_int.resource_record_set(value[0], 'AAAA', 600, [ipv6ip, ])
+            changes_returned_internal.append(rrs)
+        if value[1] == "AAAA" and v6ip is not None:
+            rrs = my_zone_int.resource_record_set(value[0], 'AAAA', ttl, [v6ip, ])
             my_zone_changes.add_record_set(rrs)
-            changes_returned.append(rrs)
+            changes_returned_internal.append(rrs)
     my_zone_changes.create()
     while my_zone_changes.status != 'done':
         time.sleep(1)
         my_zone_changes.reload()
-    return changes_returned, len(my_zone_changes.additions)
+    return changes_returned_internal, len(my_zone_changes.additions)
 
 
 if __name__ == '__main__':
     # Run script
     arg_ns = argparser()
     auto_proceed(arg_ns)
-    credentials, scoped_credentials = load_creds()
+    scoped_credentials = load_creds()
     ipv4ip, ipv6ip = retrieve_addresses(arg_ns)
-    gdnsclient = gdns.Client(project=credentials.project_id, credentials=scoped_credentials)
+    gdnsclient = gdns.Client(project=scoped_credentials.project_id, credentials=scoped_credentials)
     zone_list = all_zones(gdnsclient)
     zones_to_edit, passed_records_with_no_zone = zones_to_edit_func(zone_list, arg_ns.record)
     for zone_key, records_to_change in zones_to_edit.items():
-        my_zone = zone_list[f'{zone_key}']
-        print(f"Currently gathering records for {my_zone.dns_name}")
+        my_zone = zone_list[str(zone_key)]
+        print("Currently gathering records for {0}".format(my_zone.dns_name))
         # Check for existing records before doing anything
         existing_to_delete, to_create, delete_len = check_records(my_zone, records_to_change, ipv4ip, ipv6ip)
         # Delete existing records
@@ -220,9 +229,8 @@ if __name__ == '__main__':
         # If we have records to create, we do it here
         # Else, take no action
         if to_create:
-            changes_returned, len_additions = add_records(my_zone, to_create, ipv4ip, ipv6ip)
-            print(f"Created {len_additions} record{'s' if len_additions != 1 else ''}.\n")
+            changes_returned, len_additions = add_records(my_zone, to_create, ipv4ip, ipv6ip, arg_ns.ttl)
+            print("Created {0} record{1}.\n".format(len_additions, 's' if len_additions != 1 else ''))
         else:
-            print(f"All given records for {my_zone.dns_name} are up to date. "
-                  f"Not performing any actions on this zone.\n")
-    print("Script Completed.")
+            print("All given records for {0} are up to date. Not performing any actions on this zone.\n".
+                  format(my_zone.dns_name))

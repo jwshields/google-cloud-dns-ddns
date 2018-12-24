@@ -164,6 +164,7 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
                     break
                 # Check the TTL length
                 existing_record = True
+                resource_record_set = recordset
                 if ttl != recordset.ttl:
                     ttl_diff = True
                 # Small if/else for A/AAAA records
@@ -171,17 +172,14 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
                     no_touch = True
                     if ttl_diff:
                         no_touch = False
-                        resource_record_set = recordset
                     break
                 elif (recordset.record_type == "AAAA") and (str(recordset.rrdatas[0]) == str(v6ip)):
                     no_touch = True
                     if ttl_diff:
                         no_touch = False
-                        resource_record_set = recordset
                     break
                 else:
                     no_touch = False
-                    resource_record_set = recordset
                     break
             else:
                 no_touch = False

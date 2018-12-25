@@ -157,32 +157,35 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
         if not record[0].endswith("."):
             record[0] = "{0}.".format(record[0])
         for recordset in existing_list:
-            if recordset.name == record[0] and record[1] == recordset.record_type:
+            if (recordset.name == record[0]) and (record[1] == recordset.record_type):
                 # We explicitly do not want to modify records that have more than one entry.
                 if len(recordset.rrdatas) > 1:
                     no_touch = True
                     break
                 # Check the TTL length
-                existing_record = True
                 resource_record_set = recordset
                 if ttl != recordset.ttl:
                     ttl_diff = True
                 # Small if/else for A/AAAA records
                 if (recordset.record_type == "A") and (str(recordset.rrdatas[0]) == str(v4ip)):
-                    no_touch = True
                     if ttl_diff:
+                        existing_record = True
                         no_touch = False
+                    else:
+                        no_touch = True
                     break
                 elif (recordset.record_type == "AAAA") and (str(recordset.rrdatas[0]) == str(v6ip)):
-                    no_touch = True
                     if ttl_diff:
+                        existing_record = True
                         no_touch = False
+                    else:
+                        no_touch = True
                     break
                 else:
+                    existing_record = True
                     no_touch = False
                     break
             else:
-                no_touch = False
                 pass
         if existing_record:
             existing_del[str(resource_record_set.name)] = resource_record_set

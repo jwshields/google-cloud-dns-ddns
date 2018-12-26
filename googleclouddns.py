@@ -137,8 +137,8 @@ def zones_to_edit_func(all_zones_func, records):
 
 def check_records(my_zone_int, records, v4ip, v6ip, ttl):
     existing_list = list(my_zone_int.list_resource_record_sets())
-    existing_del = {}
-    create = {}
+    to_del, to_create = {}, {}
+    num_to_update, not_updated, num_to_create = 0,0,0
     # This is a really hacky and shit method of doing this.
     # In this thing we start iterating over the list of records passed in as args
     # then we append a period to the end of a record if it does not have one;
@@ -150,59 +150,57 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
     #   if it is, we don't edit the record
     #   otherwise, we do edit it.
     for record in records:
-        no_touch = False
-        ttl_diff = False
-        existing_record = False
-        resource_record_set = None
         if not record[0].endswith("."):
             record[0] = "{0}.".format(record[0])
+        no_edit, existing_record, rrs = True, False, None
         for recordset in existing_list:
             if (recordset.name == record[0]) and (record[1] == recordset.record_type):
+                rrs = recordset
+                existing_record = True
                 # We explicitly do not want to modify records that have more than one entry.
                 if len(recordset.rrdatas) > 1:
-                    no_touch = True
                     break
-                # Check the TTL length
-                resource_record_set = recordset
                 if ttl != recordset.ttl:
-                    ttl_diff = True
-                # Small if/else for A/AAAA records
+                    no_edit = False
+                    break
                 if (recordset.record_type == "A") and (str(recordset.rrdatas[0]) == str(v4ip)):
-                    if ttl_diff:
-                        existing_record = True
-                        no_touch = False
-                    else:
-                        no_touch = True
                     break
                 elif (recordset.record_type == "AAAA") and (str(recordset.rrdatas[0]) == str(v6ip)):
-                    if ttl_diff:
-                        existing_record = True
-                        no_touch = False
-                    else:
-                        no_touch = True
                     break
                 else:
-                    existing_record = True
-                    no_touch = False
+                    no_edit = False
                     break
             else:
                 pass
-        if existing_record:
-            existing_del[str(resource_record_set.name)] = resource_record_set
-        if not no_touch:
-            create['{0}.{1}'.format(record[0], record[1])] = record
-    return existing_del, create, len(existing_del)
+        if existing_record is True:
+            if no_edit is False:
+                to_del[str(rrs.name)] = rrs
+                to_create['{0}.{1}'.format(record[0], record[1])] = record
+                num_to_update += 1
+            else:
+                not_updated += 1
+        elif existing_record is False:
+            to_create['{0}.{1}'.format(record[0], record[1])] = record
+            num_to_create += 1
+        else:
+            pass
+    return to_del, to_create, num_to_create, num_to_update, not_updated
 
 
-def delete_records(my_zone_int, existing_del, new_create):
-    my_zone_changes = my_zone_int.changes()
-    for k, v in existing_del.items():
-        my_zone_changes.delete_record_set(v)
+def _zone_change_status_waiter(my_zone_changes):
     my_zone_changes.create()
     while my_zone_changes.status != 'done':
         time.sleep(1)
         my_zone_changes.reload()
-    return existing_del, new_create
+    return my_zone_changes
+
+
+def delete_records(my_zone_int, existing_del):
+    my_zone_changes = my_zone_int.changes()
+    for _, v in existing_del.items():
+        my_zone_changes.delete_record_set(v)
+    _zone_change_status_waiter(my_zone_changes)
+    return
 
 
 def add_records(my_zone_int, new_create, v4ip, v6ip, ttl):
@@ -211,20 +209,17 @@ def add_records(my_zone_int, new_create, v4ip, v6ip, ttl):
     my_zone_changes = my_zone_int.changes()
     changes_returned_internal = []
     for _, value in new_create.items():
+        rrs = None
         if not value[0].endswith("."):
             value[0] = '{0}.'.format(value[0])
         if value[1] == "A" and v4ip is not None:
             rrs = my_zone_int.resource_record_set(value[0], 'A', ttl, [v4ip, ])
             my_zone_changes.add_record_set(rrs)
-            changes_returned_internal.append(rrs)
         if value[1] == "AAAA" and v6ip is not None:
             rrs = my_zone_int.resource_record_set(value[0], 'AAAA', ttl, [v6ip, ])
             my_zone_changes.add_record_set(rrs)
-            changes_returned_internal.append(rrs)
-    my_zone_changes.create()
-    while my_zone_changes.status != 'done':
-        time.sleep(1)
-        my_zone_changes.reload()
+        changes_returned_internal.append(rrs)
+    my_zone_changes = _zone_change_status_waiter(my_zone_changes)
     return changes_returned_internal, len(my_zone_changes.additions)
 
 
@@ -232,6 +227,7 @@ if __name__ == '__main__':
     # Run script
     arg_ns = argparser()
     auto_proceed(arg_ns)
+    num_to_create, num_to_update, num_untouched = 0, 0, 0
     scoped_credentials = load_creds()
     ipv4ip, ipv6ip = retrieve_addresses(arg_ns)
     gdnsclient = gdns.Client(project=scoped_credentials.project_id, credentials=scoped_credentials)
@@ -241,15 +237,20 @@ if __name__ == '__main__':
         my_zone = zone_list[str(zone_key)]
         print("Currently gathering records for {0}".format(my_zone.dns_name))
         # Check for existing records before doing anything
-        existing_to_delete, to_create, _ = check_records(my_zone, records_to_change, ipv4ip, ipv6ip, arg_ns.ttl)
+        existing_to_delete, to_create, nc, nu, notu = check_records(my_zone, records_to_change, ipv4ip, ipv6ip, arg_ns.ttl)
+        num_to_update += nu
+        num_to_create += nc
+        num_untouched += notu
         # Delete existing records
         if existing_to_delete and to_create:
-            existing_to_delete, to_create = delete_records(my_zone, existing_to_delete, to_create)
+            delete_records(my_zone, existing_to_delete)
         # If we have records to create, we do it here
         # Else, take no action
         if to_create:
             changes_returned, len_additions = add_records(my_zone, to_create, ipv4ip, ipv6ip, arg_ns.ttl)
             print("Created {0} record{1}.\n".format(len_additions, 's' if len_additions != 1 else ''))
         else:
-            print("All given records for {0} are up to date. Not performing any actions on this zone.\n".
+            print("All given records for \"{0}\" are up to date. No actions have been performed in this zone.\n".
                   format(my_zone.dns_name))
+    finalmessage = "Results:\n{0} records updated\n{1} records created\n{2} records not modified\n\n#EOF"
+    print(finalmessage.format(num_to_update, num_to_create, num_untouched))

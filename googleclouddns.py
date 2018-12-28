@@ -154,19 +154,19 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
             record[0] = "{0}.".format(record[0])
         no_edit, existing_record, rrs = True, False, None
         for recordset in existing_list:
+            # We explicitly do not want to modify records that have more than one entry.
+            if len(recordset.rrdatas) > 1:
+                continue
             if (recordset.name == record[0]) and (record[1] == recordset.record_type):
                 rrs = recordset
                 existing_record = True
-                # We explicitly do not want to modify records that have more than one entry.
-                if len(recordset.rrdatas) > 1:
-                    break
                 if ttl != recordset.ttl:
                     no_edit = False
                     break
                 if (recordset.record_type == "A") and (str(recordset.rrdatas[0]) == str(v4ip)):
-                    break
+                    continue
                 elif (recordset.record_type == "AAAA") and (str(recordset.rrdatas[0]) == str(v6ip)):
-                    break
+                    continue
                 else:
                     no_edit = False
                     break

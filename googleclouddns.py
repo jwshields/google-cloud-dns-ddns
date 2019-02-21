@@ -164,9 +164,9 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
                     no_edit = False
                     break
                 if (recordset.record_type == "A") and (str(recordset.rrdatas[0]) == str(v4ip)):
-                    continue
+                    break
                 elif (recordset.record_type == "AAAA") and (str(recordset.rrdatas[0]) == str(v6ip)):
-                    continue
+                    break
                 else:
                     no_edit = False
                     break
@@ -174,7 +174,7 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
                 pass
         if existing_record is True:
             if no_edit is False:
-                to_del[str(rrs.name)] = rrs
+                to_del['{0}.{1}'.format(rrs.name, rrs.record_type)] = rrs
                 to_create['{0}.{1}'.format(record[0], record[1])] = record
                 num_to_update += 1
             else:
@@ -184,6 +184,7 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
             num_to_create += 1
         else:
             pass
+        rrs = None
     return to_del, to_create, num_to_create, num_to_update, not_updated
 
 

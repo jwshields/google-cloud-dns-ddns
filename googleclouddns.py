@@ -140,6 +140,7 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
     to_del, to_create = {}, {}
     num_to_update, not_updated, num_to_create = 0,0,0
     # This is a really hacky and shit method of doing this.
+    # TODO: Look into a separate way of iterating records rather than a massive nested loop
     # In this thing we start iterating over the list of records passed in as args
     # then we append a period to the end of a record if it does not have one;
     #   this is to conform to the way a record needs to be formatted
@@ -191,7 +192,7 @@ def check_records(my_zone_int, records, v4ip, v6ip, ttl):
 def _zone_change_status_waiter(my_zone_changes):
     my_zone_changes.create()
     while my_zone_changes.status != 'done':
-        time.sleep(1)
+        time.sleep(2)
         my_zone_changes.reload()
     return my_zone_changes
 

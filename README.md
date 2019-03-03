@@ -59,4 +59,5 @@ This script accepts multiple arguments
 2. `python /path/to/script/googleclouddns.py -r "mydomain.com" A -c "D:\path\to\my\credentials.json"`
     - This example will create a single A record for `mydomain.com` and will prompt the user to proceed to create/update the records
 
+
 #### EOF
